@@ -3,7 +3,10 @@ const SplitIterator = std.mem.SplitIterator;
 
 pub const ProcessOutput = struct {
     exit_code: u8,
-    output_lines: *std.ArrayList([]const u8),
+    allocator: *std.mem.Allocator,
+    output_lines: []const []const u8,
+    stderr: []const u8,
+    stdout: []const u8,
 
     pub fn runAndCollectOutput(exe_file_path: []const u8, args: []const []const u8, allocator: *std.mem.Allocator) !ProcessOutput {
         var argv = std.ArrayList([]const u8).init(allocator);
@@ -16,7 +19,6 @@ pub const ProcessOutput = struct {
         const child = std.ChildProcess.init(argv.items, allocator) catch unreachable;
         defer child.deinit();
 
-        std.debug.print("{s}", .{child.cwd});
         child.stdin_behavior = .Pipe;
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
@@ -37,6 +39,7 @@ pub const ProcessOutput = struct {
         var stderr_iterator = std.mem.split(u8, stderr, "\n");
 
         var output_lines = std.ArrayList([]const u8).init(allocator);
+        defer output_lines.deinit();
         try collectIteratorIntoArrayList(u8, &output_lines, &stdout_iterator);
         try output_lines.append("Output from stderr:");
         try collectIteratorIntoArrayList(u8, &output_lines, &stderr_iterator);
@@ -48,13 +51,15 @@ pub const ProcessOutput = struct {
             }});
             return err;
         };
-
-        for (output_lines.items) |line, idx| {
-            std.debug.print("line {d}: {s}\n", .{ idx, line });
-        }
         switch (term) {
             .Exited => |exit_code| {
-                return ProcessOutput{ .exit_code = exit_code, .output_lines = &output_lines };
+                return ProcessOutput{
+                    .allocator = allocator,
+                    .exit_code = exit_code,
+                    .output_lines = output_lines.toOwnedSlice(),
+                    .stderr = stderr,
+                    .stdout = stdout,
+                };
             },
             else => {
                 std.debug.print("{s} terminated unexpectedly\n", .{exe_file_path});
@@ -70,6 +75,8 @@ pub const ProcessOutput = struct {
     }
 
     pub fn deinit(self: ProcessOutput) void {
-        self.output_lines.deinit();
+        self.allocator.free(self.output_lines);
+        self.allocator.free(self.stderr);
+        self.allocator.free(self.stdout);
     }
 };
