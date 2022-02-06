@@ -15,7 +15,8 @@ test "process args" {
     const expected_string =
         \\
         \\Output from stderr:
-        \\Hello world!
+        \\arg 0: ./zig-out/bin/bin_for_testing__process_args.exe
+        \\arg 1: ping
         \\
     ;
 
