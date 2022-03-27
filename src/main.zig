@@ -1,5 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
+const args = @import("args.zig");
 const params = @import("params.zig");
 
 export fn add(a: i32, b: i32) i32 {
