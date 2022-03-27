@@ -9,11 +9,11 @@ pub const Arg = union(enum) {
 
 pub fn ParseInstruction(comptime R: type) type {
     return struct {
-        f: fn (arg: Arg, allocator: *std.mem.Allocator) R,
+        f: fn (arg: Arg, allocator: std.mem.Allocator) R,
 
-        pub fn optional(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+        pub fn optional(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: std.mem.Allocator) T) @This() {
             const F = struct {
-                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                fn f(arg: Arg, allocator: std.mem.Allocator) R {
                     return switch (arg) {
                         .no_arg => unreachable,
                         .arg => |*arg_| blk: {
@@ -29,9 +29,9 @@ pub fn ParseInstruction(comptime R: type) type {
             return @This(){ .f = F.f };
         }
 
-        pub fn required(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+        pub fn required(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: std.mem.Allocator) T) @This() {
             const F = struct {
-                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                fn f(arg: Arg, allocator: std.mem.Allocator) R {
                     return switch (arg) {
                         .no_arg => unreachable,
                         .arg => |*arg_| blk: {
@@ -44,9 +44,9 @@ pub fn ParseInstruction(comptime R: type) type {
 
             return @This(){ .f = F.f };
         }
-        pub fn no_arg(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+        pub fn no_arg(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: std.mem.Allocator) T) @This() {
             const F = struct {
-                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                fn f(arg: Arg, allocator: std.mem.Allocator) R {
                     _ = parse;
                     _ = allocator;
                     return switch (arg) {
@@ -68,11 +68,11 @@ pub fn Flag(comptime R: type) type {
     };
 }
 
-fn string_parser(str: [:0]const u8, _: *std.mem.Allocator) [:0]const u8 {
+fn string_parser(str: [:0]const u8, _: std.mem.Allocator) [:0]const u8 {
     return str;
 }
 
-fn int_parser(str: [:0]const u8, _: *std.mem.Allocator) u32 {
+fn int_parser(str: [:0]const u8, _: std.mem.Allocator) u32 {
     return std.fmt.parseInt(u32, str, 10) catch unreachable;
 }
 

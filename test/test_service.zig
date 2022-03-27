@@ -1,14 +1,13 @@
 const std = @import("std");
 const SplitIterator = std.mem.SplitIterator;
-
 pub const ProcessOutput = struct {
     exit_code: u8,
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     output_lines: []const []const u8,
     stderr: []const u8,
     stdout: []const u8,
 
-    pub fn runAndCollectOutput(exe_file_path: []const u8, args: []const []const u8, allocator: *std.mem.Allocator) !ProcessOutput {
+    pub fn runAndCollectOutput(exe_file_path: []const u8, args: []const []const u8, allocator: std.mem.Allocator) !ProcessOutput {
         var argv = std.ArrayList([]const u8).init(allocator);
         defer argv.deinit();
         try argv.append(exe_file_path);

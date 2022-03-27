@@ -2,7 +2,7 @@ const std = @import("std");
 const allocator = std.testing.allocator;
 
 pub fn main() !void {
-    var arg_iterator = std.process.argsWithAllocator(allocator);
+    var arg_iterator = try std.process.argsWithAllocator(allocator);
     defer arg_iterator.deinit();
 
     var i: u8 = 0;
