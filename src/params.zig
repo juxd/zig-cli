@@ -2,74 +2,92 @@ const std = @import("std");
 const testing = std.testing;
 const Params = @This();
 
-pub fn ArgType(comptime R: type) type {
+pub const Arg = union(enum) {
+    arg: ?[:0]const u8,
+    no_arg: bool,
+};
+
+pub fn ParseInstruction(comptime R: type) type {
     return struct {
-        fn ParseWith(comptime T: type) type {
-            return union(enum) {
-                required: fn (str: [:0]const u8, allocator: std.mem.Allocator) T,
-                optional: fn (str: [:0]const u8, allocator: std.mem.Allocator) T,
-                no_arg,
+        f: fn (arg: Arg, allocator: *std.mem.Allocator) R,
+
+        pub fn optional(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+            const F = struct {
+                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                    return switch (arg) {
+                        .no_arg => unreachable,
+                        .arg => |*arg_| blk: {
+                            if (arg_.*) |str| {
+                                break :blk parse(str, allocator);
+                            }
+                            break :blk null;
+                        },
+                    };
+                }
             };
+
+            return @This(){ .f = F.f };
         }
 
-        pub fn optional(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: std.mem.Allocator) T) @This() {
-            if (R != ?T) {
-                @compileError("ArgType.optional(): R must be ?T");
-            }
-            return @This(){
-                .parse_fn = ParseWith(T){ .optional = parse },
+        pub fn required(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+            const F = struct {
+                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                    return switch (arg) {
+                        .no_arg => unreachable,
+                        .arg => |*arg_| blk: {
+                            const str = arg_.* orelse unreachable;
+                            break :blk parse(str, allocator);
+                        },
+                    };
+                }
             };
+
+            return @This(){ .f = F.f };
         }
-
-        pub fn required(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: std.mem.Allocator) T) @This() {
-            if (R != !T) {
-                @compileError("ArgType.optional(): R must be !T");
-            }
-            return @This(){
-                .parse_fn = ParseWith(T){ .required = parse },
+        pub fn no_arg(comptime T: type, comptime parse: fn (str: [:0]const u8, allocator: *std.mem.Allocator) T) @This() {
+            const F = struct {
+                fn f(arg: Arg, allocator: *std.mem.Allocator) R {
+                    _ = parse;
+                    _ = allocator;
+                    return switch (arg) {
+                        .no_arg => |*no_arg| no_arg.*,
+                        .arg => unreachable,
+                    };
+                }
             };
-        }
 
-        pub fn no_arg() @This() {
-            if (R != bool) {
-                @compileError("ArgType.no_arg() can only be called with boolean return type.");
-            }
-
-            return @This(){
-                .parse_fn = ParseWith{.no_arg},
-            };
+            return @This(){ .f = F.f };
         }
     };
 }
 
-pub fn One(comptime T: type) type {
+pub fn Flag(comptime R: type) type {
     return struct {
         flag: []const u8,
-        arg_type: ArgType(T),
+        arg_type: ParseInstruction(R),
     };
 }
 
-fn string_parser(str: [:0]const u8, _: std.mem.Allocator) [:0]const u8 {
+fn string_parser(str: [:0]const u8, _: *std.mem.Allocator) [:0]const u8 {
     return str;
 }
 
-fn int_parser(str: [:0]const u8, _: std.mem.Allocator) u32 {
+fn int_parser(str: [:0]const u8, _: *std.mem.Allocator) u32 {
     return std.fmt.parseInt(u32, str, 10) catch unreachable;
 }
 
 test "types work" {
-    const string_param = One{
-        .flag = "str",
-        .arg_type = ArgType.required(),
+    const string_param = Flag([:0]const u8){
+        .flag = "string",
+        .arg_type = ParseInstruction([:0]const u8).required([:0]const u8, string_parser),
     };
 
-    const int_param = One{
+    const int_param = Flag(?u32){
         .flag = "int",
-        .arg_type = ArgType(u32){
-            .required = int_parser,
-        },
+        .arg_type = ParseInstruction(?u32).optional(u32, int_parser),
     };
 
-    try testing.expect(string_param.arg_type.toReturnType() == ![:0]const u8);
-    try testing.expect(int_param.arg_type.toReturnType() == !u32);
+    try testing.expect(std.mem.eql(u8, string_param.arg_type.f(Arg{ .arg = "hello" }, testing.allocator), "hello"));
+    try testing.expect(int_param.arg_type.f(Arg{ .arg = "123" }, testing.allocator) == @as(u32, 123));
+    try testing.expect(int_param.arg_type.f(Arg{ .arg = null }, testing.allocator) == null);
 }
