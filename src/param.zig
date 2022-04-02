@@ -122,15 +122,15 @@ fn int_parser(str: [:0]const u8, _: std.mem.Allocator) u32 {
     return std.fmt.parseInt(u32, str, 10) catch unreachable;
 }
 
+const parse_required_string_arg = FlagArg([:0]const u8).required([:0]const u8, string_parser);
+
+const parse_optional_int_arg = FlagArg(?u32).optional(u32, int_parser);
+
+const parse_required_string_anon = AnonArg([:0]const u8).required([:0]const u8, string_parser);
+
+const parse_optional_int_anon = AnonArg(?u32).optional(u32, int_parser);
+
 test "types work" {
-    const parse_required_string_arg = FlagArg([:0]const u8).required([:0]const u8, string_parser);
-
-    const parse_optional_int_arg = FlagArg(?u32).optional(u32, int_parser);
-
-    const parse_required_string_anon = AnonArg([:0]const u8).required([:0]const u8, string_parser);
-
-    const parse_optional_int_anon = AnonArg(?u32).optional(u32, int_parser);
-
     try testing.expect(std.mem.eql(u8, parse_required_string_arg.f(Arg{ .arg = "hello" }, testing.allocator), "hello"));
     try testing.expect(parse_optional_int_arg.f(Arg{ .arg = "123" }, testing.allocator) == @as(u32, 123));
     try testing.expect(parse_optional_int_arg.f(Arg{ .arg = null }, testing.allocator) == null);
@@ -158,11 +158,6 @@ fn One(comptime T: type) type {
         const Anon = struct {
             arg: AnonArg(T),
         };
-
-        fn getType(comptime self: @This()) type {
-            _ = self;
-            return T;
-        }
     };
 }
 
@@ -207,3 +202,7 @@ const ParamForParsing = struct {
 const Param = struct {
     ones: anytype,
 };
+
+test "can construct ParamForParsing" {
+    const param = Param{ .ones = .{} };
+}
